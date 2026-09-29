@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AEGIS-ENV</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;700&family=Noto+Sans+Devanagari:wght@400;500;700&family=Noto+Sans+Telugu:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3f6f9; --surface:#ffffff; --ink:#0f2233; --muted:#576a7b; --line:#dfe6ed;
+    --brand:#0b5c7a; --brand-ink:#ffffff; --soft:#e8f1f6;
+    --ok:#1f9d55; --mod:#e08a00; --high:#c62828; --off:#8d99a5;
+    --ok-bg:#e8f6ee; --mod-bg:#fdf1de; --high-bg:#fbe9e9;
+    --r:12px; --shadow:0 1px 3px rgba(15,34,51,.08),0 4px 14px rgba(15,34,51,.05);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --bg:#0d1922; --surface:#14252f; --ink:#e6eef4; --muted:#9db0bf; --line:#243a49;
+      --brand:#2a8fb5; --soft:#1a3242; --ok-bg:#12301f; --mod-bg:#3a2a0d; --high-bg:#3b1717; --shadow:none; }
+  }
+  *{box-sizing:border-box}
+  html{scroll-padding-top:70px}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:"Public Sans","Noto Sans Devanagari","Noto Sans Telugu",system-ui,sans-serif;line-height:1.45}
+  button,input,select{font:inherit;color:inherit}
+  button{cursor:pointer}
+  [hidden]{display:none!important}
+  :focus-visible{outline:3px solid #f2b705;outline-offset:2px}
+  h1,h2,h3{margin:0}
+  .muted{color:var(--muted)}
+
+  /* buttons and fields */
+  .btn{background:var(--brand);color:var(--brand-ink);border:0;border-radius:10px;padding:.7rem 1.1rem;font-weight:700;min-height:44px}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+  .field{display:block;margin:.85rem 0}
+  .field>span{display:block;font-weight:500;margin-bottom:.3rem}
+  .field small{color:var(--muted);display:block;margin-top:.25rem}
+  input[type=text],input[type=email],input[type=password],select{
+    width:100%;padding:.7rem .8rem;border:1px solid var(--line);border-radius:10px;background:var(--surface);min-height:44px}
+  .checks{display:flex;flex-wrap:wrap;gap:.5rem}
+  .checks label{display:inline-flex;align-items:center;gap:.4rem;border:1px solid var(--line);border-radius:999px;padding:.4rem .8rem;background:var(--surface);min-height:40px}
+  .msg{min-height:1.3em;margin-top:.6rem;font-size:.92rem}
+  .msg.err{color:var(--high)} .msg.ok{color:var(--ok)}
+
+  /* auth */
+  #auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:1.25rem;
+    background:linear-gradient(160deg,#0b3d52,#0b5c7a 55%,#1a7f6b)}
+  .auth-card{background:var(--surface);border-radius:16px;padding:1.75rem;width:min(460px,100%);box-shadow:0 10px 40px rgba(0,0,0,.25)}
+  .auth-card h1{font-size:1.6rem}
+  .auth-card .sub{margin:.25rem 0 1rem;color:var(--muted)}
+  .seg{display:flex;background:var(--soft);border-radius:10px;padding:4px;gap:4px;margin-bottom:.5rem}
+  .seg button{flex:1;border:0;background:transparent;border-radius:8px;padding:.55rem;min-height:40px;font-weight:500}
+  .seg button[aria-selected="true"]{background:var(--surface);font-weight:700;box-shadow:var(--shadow)}
+  .auth-lang{margin-top:1rem}
+
+  /* app shell */
+  .top{position:sticky;top:0;z-index:1000;background:var(--surface);border-bottom:1px solid var(--line);
+    display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1rem;padding:.6rem 1rem}
+  .brand{display:flex;flex-direction:column;line-height:1.15}
+  .brand b{font-size:1.15rem;color:var(--brand)}
+  .brand span{font-size:.78rem;color:var(--muted)}
+  nav[role=tablist]{display:flex;gap:.25rem;overflow-x:auto;flex:1;min-width:220px}
+  nav button{border:0;background:transparent;padding:.55rem .9rem;border-radius:999px;font-weight:500;white-space:nowrap;min-height:40px}
+  nav button:hover{background:var(--soft)}
+  nav button[aria-selected="true"]{background:var(--brand);color:var(--brand-ink);font-weight:700}
+  .ctrl{display:flex;align-items:center;gap:.5rem}
+  .ctrl select{width:auto;min-height:40px;padding:.4rem .6rem}
+  #who{font-size:.9rem;color:var(--muted);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  #banner{display:flex;align-items:center;gap:.75rem;padding:.75rem 1rem;border-bottom:1px solid var(--line);font-weight:500}
+  #banner .dot{width:.9rem;height:.9rem;border-radius:50%;flex:none}
+  #banner.ok{background:var(--ok-bg)} #banner.ok .dot{background:var(--ok)}
+  #banner.mod{background:var(--mod-bg)} #banner.mod .dot{background:var(--mod)}
+  #banner.high{background:var(--high-bg)} #banner.high .dot{background:var(--high)}
+  #banner small{display:block;font-weight:400;color:var(--muted)}
+
+  section.tab{padding:1rem}
+  .grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(300px,1fr);gap:1rem;align-items:start}
+  .map{height:calc(100vh - 190px);min-height:420px;border-radius:var(--r);border:1px solid var(--line);z-index:1}
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:1rem;box-shadow:var(--shadow)}
+  .panel h2{font-size:1.05rem;margin-bottom:.6rem}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1rem}
+  .stat{background:var(--soft);border-radius:10px;padding:.6rem .7rem}
+  .stat b{display:block;font-size:1.35rem;line-height:1.15;overflow-wrap:anywhere}
+  .stat span{font-size:.78rem;color:var(--muted)}
+  .legend{display:flex;flex-wrap:wrap;gap:.4rem 1rem;margin-top:.6rem;font-size:.85rem;color:var(--muted)}
+  .legend i{display:inline-block;width:.75rem;height:.75rem;border-radius:50%;margin-right:.35rem;vertical-align:-1px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.25rem 0 .75rem}
+  .chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:.35rem .85rem;min-height:38px}
+  .chips button[aria-pressed="true"]{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);font-weight:700}
+
+  .alert{border-left:5px solid var(--mod);background:var(--mod-bg);border-radius:8px;padding:.65rem .8rem;margin:.55rem 0}
+  .alert.HIGH{border-color:var(--high);background:var(--high-bg)}
+  .alert .top2{display:flex;justify-content:space-between;gap:.5rem;font-weight:700}
+  .alert .meta{color:var(--muted);font-size:.85rem;margin:.15rem 0}
+  .empty{color:var(--muted);padding:.75rem 0}
+
+  .hot{display:flex;gap:.75rem;align-items:flex-start;padding:.65rem 0;border-bottom:1px solid var(--line);cursor:pointer}
+  .hot:last-child{border-bottom:0}
+  .hot .rank{width:2rem;height:2rem;border-radius:50%;background:var(--soft);display:flex;align-items:center;justify-content:center;font-weight:700;flex:none}
+  .hot .bar{height:6px;border-radius:3px;background:var(--line);margin-top:.35rem;overflow:hidden}
+  .hot .bar i{display:block;height:100%}
+
+  .vals{display:flex;flex-wrap:wrap;gap:1.25rem;margin:.5rem 0 1rem}
+  .vals b{display:block;font-size:1.5rem;line-height:1.1}
+  .vals span{color:var(--muted);font-size:.82rem}
+  .chartbox{position:relative;height:280px}
+  table{border-collapse:collapse;width:100%;font-size:.93rem;margin-top:.5rem}
+  th,td{text-align:left;padding:.5rem .6rem;border-bottom:1px solid var(--line)}
+  th{color:var(--muted);font-weight:500}
+  tr.node{cursor:pointer} tr.node:hover{background:var(--soft)} tr.sel{background:var(--soft)}
+  .tablewrap{overflow-x:auto}
+  .dotc{display:inline-block;width:.7rem;height:.7rem;border-radius:50%;margin-right:.4rem}
+  .narrow{max-width:520px}
+
+  @media (max-width:900px){
+    .grid{grid-template-columns:1fr}
+    .map{height:52vh;min-height:320px}
+    .stats{grid-template-columns:repeat(3,1fr)}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ============ SIGN IN / REGISTER ============ -->
+<div id="auth">
+  <div class="auth-card">
+    <h1>AEGIS-ENV</h1>
+    <p class="sub" id="authSub"></p>
+    <div class="seg" role="tablist" aria-label="Account">
+      <button id="tabIn" role="tab" aria-selected="true" data-i18n="signin"></button>
+      <button id="tabReg" role="tab" aria-selected="false" data-i18n="register"></button>
+    </div>
+
+    <div id="formIn">
+      <label class="field"><span data-i18n="email"></span><input id="inEmail" type="email" autocomplete="username"></label>
+      <label class="field"><span data-i18n="password"></span><input id="inPass" type="password" autocomplete="current-password"></label>
+      <button class="btn" id="btnIn" style="width:100%" data-i18n="signin"></button>
+    </div>
+
+    <div id="formReg" hidden>
+      <div id="regFields"></div>
+      <label class="field"><span data-i18n="email"></span><input id="regEmail" type="email" autocomplete="email"></label>
+      <label class="field"><span data-i18n="password"></span><input id="regPass" type="password" autocomplete="new-password"><small data-i18n="password_hint"></small></label>
+      <button class="btn" id="btnReg" style="width:100%" data-i18n="create_account"></button>
+    </div>
+    <div class="msg err" id="authMsg" role="alert"></div>
+
+    <label class="field auth-lang"><span data-i18n="language"></span>
+      <select class="langSel" aria-label="Language"></select></label>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand"><b>AEGIS-ENV</b><span id="brandSub"></span></div>
+    <nav role="tablist" id="tabs" aria-label="Sections"></nav>
+    <div class="ctrl">
+      <select class="langSel" aria-label="Language"></select>
+      <span id="who"></span>
+      <button class="btn ghost" id="btnOut" data-i18n="signout"></button>
+    </div>
+  </header>
+
+  <div id="banner" class="ok" role="status"><span class="dot"></span><div id="bannerText"></div></div>
+
+  <!-- Live map -->
+  <section class="tab" id="tab-map">
+    <div class="grid">
+      <div>
+        <div id="map" class="map" aria-label="Map"></div>
+        <div class="legend" id="legendLive"></div>
+      </div>
+      <div class="panel">
+        <div class="stats" id="stats"></div>
+        <h2 data-i18n="latest_alerts"></h2>
+        <div id="alertsSide"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Hotspots -->
+  <section class="tab" id="tab-hot" hidden>
+    <div class="grid">
+      <div>
+        <div id="mapHot" class="map" aria-label="Hotspot map"></div>
+        <div class="legend" id="legendHot"></div>
+      </div>
+      <div class="panel">
+        <h2 data-i18n="hot_title"></h2>
+        <p class="muted" style="margin:0 0 .5rem" data-i18n="hot_sub"></p>
+        <div class="chips" id="hotChips"></div>
+        <div id="hotList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Alerts -->
+  <section class="tab" id="tab-alerts" hidden>
+    <div class="panel">
+      <h2 data-i18n="alerts_title"></h2>
+      <div class="chips" id="alertChips"></div>
+      <div id="alertsAll"></div>
+    </div>
+  </section>
+
+  <!-- Analytics (staff only, English) -->
+  <section class="tab" id="tab-analytics" hidden>
+    <div class="panel">
+      <h2 id="anTitle">Select a node</h2>
+      <div class="vals" id="vals"></div>
+      <div class="chartbox"><canvas id="chart"></canvas></div>
+      <div style="margin-top:.75rem"><button class="btn ghost" id="csvBtn">Download CSV</button></div>
+    </div>
+    <div class="panel" style="margin-top:1rem">
+      <h2>Node health</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Node</th><th>Type</th><th>Status</th><th>Last seen</th><th>Signal (dBm)</th><th>Edge AI</th></tr></thead>
+        <tbody id="nodeRows"></tbody>
+      </table></div>
+    </div>
+  </section>
+
+  <!-- My area (citizens) -->
+  <section class="tab" id="tab-settings" hidden>
+    <div class="panel narrow">
+      <h2 data-i18n="settings_title"></h2>
+      <div id="setFields"></div>
+      <button class="btn" id="btnSave" data-i18n="save"></button>
+      <div class="msg" id="setMsg" role="status"></div>
+    </div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getDatabase, ref, onValue, query, orderByKey, limitToLast, get, set }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+// Firebase settings are read from config.json (same folder as this file)
+const firebaseConfig = await (await fetch("config.json")).json();
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getDatabase(app);
+
+/* =====================================================================
+   LANGUAGES  (English, Hindi, Telugu). Add a language by adding a block.
+   ===================================================================== */
+const LANGS = { en: "English", hi: "हिन्दी", te: "తెలుగు" };
+const I18N = {
+  en: {
+    brand_sub: "Live hazard monitoring for floods, fires and air pollution",
+    tab_map: "Live map", tab_hot: "Hotspots", tab_alerts: "Alerts", tab_analytics: "Analytics", tab_settings: "My area",
+    signin: "Sign in", register: "Register", signout: "Sign out",
+    auth_sub_in: "Sign in to see live hazard data.",
+    auth_sub_reg: "Create a free citizen account to get alerts for your area.",
+    email: "Email", password: "Password", password_hint: "At least 6 characters",
+    name: "Your name", area: "Area or village", language: "Language", hazards_label: "Alerts I want",
+    use_location: "Use my location", location_set: "Location saved", location_fail: "Could not get location",
+    location_why: "Used only to show alerts near you.",
+    create_account: "Create account", save: "Save", saved: "Saved",
+    err_signin: "Sign-in failed. Check your email and password.",
+    err_exists: "This email is already registered. Try signing in.",
+    err_weak: "Password must be at least 6 characters.",
+    err_generic: "Something went wrong. Please try again.",
+    err_fields: "Please enter your name and area.",
+    hazard_flood: "Flood", hazard_fire: "Fire", hazard_pollution: "Pollution", hazard_multi: "Multi-hazard",
+    risk_HIGH: "High", risk_MODERATE: "Moderate", risk_OK: "Normal", risk_OFF: "Offline",
+    status_online: "Online",
+    stat_nodes: "Nodes online", stat_alerts: "Alerts (24 h)", stat_top: "Top hotspot",
+    banner_clear: "All clear. No active alerts near you.",
+    banner_clear_staff: "All clear. No alerts in the last 6 hours.",
+    banner_high: "{hazard}: high risk", banner_mod: "{hazard}: moderate risk",
+    banner_staff: "{n} alerts in the last 6 hours",
+    alerts_title: "Alerts", latest_alerts: "Latest alerts",
+    alerts_empty: "No alerts yet. Alerts appear here when a risk is detected.",
+    filter_all: "All", confidence: "confidence", source_edge: "edge AI", source_cloud: "cloud AI",
+    km_away: "{d} km away", never: "never",
+    hot_title: "Hotspots", hot_sub: "Places with the most recent high-risk alerts (last 7 days).",
+    hot_empty: "No hotspots yet.", hot_alerts: "{n} alerts", hot_last: "Last alert", legend_title: "Risk",
+    settings_title: "My area and alerts",
+    val_water: "Water level", val_air: "Air quality index", val_temp: "Temperature", val_hum: "Humidity",
+    rec_flood_HIGH: "Move to higher ground now and avoid flooded roads. Follow instructions from local authorities.",
+    rec_flood_MODERATE: "Water is rising. Stay alert and be ready to move to higher ground.",
+    rec_fire_HIGH: "Fire risk is high nearby. Stay away from the area and follow evacuation instructions.",
+    rec_fire_MODERATE: "Possible fire risk nearby. Avoid open flames and stay alert.",
+    rec_pollution_HIGH: "Air quality is very poor. Stay indoors, wear a mask outside, and avoid outdoor activity.",
+    rec_pollution_MODERATE: "Air quality is poor. Limit outdoor activity, especially for children and the elderly."
+  },
+  hi: {
+    brand_sub: "बाढ़, आग और वायु प्रदूषण की लाइव निगरानी",
+    tab_map: "लाइव मैप", tab_hot: "हॉटस्पॉट", tab_alerts: "अलर्ट", tab_analytics: "विश्लेषण", tab_settings: "मेरा क्षेत्र",
+    signin: "साइन इन", register: "पंजीकरण करें", signout: "साइन आउट",
+    auth_sub_in: "लाइव आपदा डेटा देखने के लिए साइन इन करें।",
+    auth_sub_reg: "अपने क्षेत्र के अलर्ट पाने के लिए निःशुल्क नागरिक खाता बनाएँ।",
+    email: "ईमेल", password: "पासवर्ड", password_hint: "कम से कम 6 अक्षर",
+    name: "आपका नाम", area: "क्षेत्र या गाँव", language: "भाषा", hazards_label: "मुझे ये अलर्ट चाहिए",
+    use_location: "मेरा स्थान उपयोग करें", location_set: "स्थान सहेजा गया", location_fail: "स्थान प्राप्त नहीं हो सका",
+    location_why: "केवल आपके पास के अलर्ट दिखाने के लिए।",
+    create_account: "खाता बनाएँ", save: "सहेजें", saved: "सहेजा गया",
+    err_signin: "साइन इन विफल। ईमेल और पासवर्ड जाँचें।",
+    err_exists: "यह ईमेल पहले से पंजीकृत है। साइन इन करें।",
+    err_weak: "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए।",
+    err_generic: "कुछ गलत हो गया। कृपया फिर प्रयास करें।",
+    err_fields: "कृपया अपना नाम और क्षेत्र दर्ज करें।",
+    hazard_flood: "बाढ़", hazard_fire: "आग", hazard_pollution: "प्रदूषण", hazard_multi: "बहु-आपदा",
+    risk_HIGH: "उच्च", risk_MODERATE: "मध्यम", risk_OK: "सामान्य", risk_OFF: "ऑफ़लाइन",
+    status_online: "ऑनलाइन",
+    stat_nodes: "ऑनलाइन नोड", stat_alerts: "अलर्ट (24 घंटे)", stat_top: "शीर्ष हॉटस्पॉट",
+    banner_clear: "सब सामान्य है। आपके पास कोई सक्रिय अलर्ट नहीं।",
+    banner_clear_staff: "सब सामान्य। पिछले 6 घंटे में कोई अलर्ट नहीं।",
+    banner_high: "{hazard}: उच्च जोखिम", banner_mod: "{hazard}: मध्यम जोखिम",
+    banner_staff: "पिछले 6 घंटे में {n} अलर्ट",
+    alerts_title: "अलर्ट", latest_alerts: "ताज़ा अलर्ट",
+    alerts_empty: "अभी कोई अलर्ट नहीं। जोखिम मिलने पर अलर्ट यहाँ दिखेंगे।",
+    filter_all: "सभी", confidence: "विश्वसनीयता", source_edge: "एज AI", source_cloud: "क्लाउड AI",
+    km_away: "{d} किमी दूर", never: "कभी नहीं",
+    hot_title: "हॉटस्पॉट", hot_sub: "हाल के उच्च जोखिम अलर्ट वाले स्थान (पिछले 7 दिन)।",
+    hot_empty: "अभी कोई हॉटस्पॉट नहीं।", hot_alerts: "{n} अलर्ट", hot_last: "आखिरी अलर्ट", legend_title: "जोखिम",
+    settings_title: "मेरा क्षेत्र और अलर्ट",
+    val_water: "जल स्तर", val_air: "वायु गुणवत्ता सूचकांक", val_temp: "तापमान", val_hum: "आर्द्रता",
+    rec_flood_HIGH: "तुरंत ऊँचे स्थान पर जाएँ और बाढ़ वाली सड़कों से बचें। स्थानीय अधिकारियों के निर्देशों का पालन करें।",
+    rec_flood_MODERATE: "पानी बढ़ रहा है। सतर्क रहें और ऊँचे स्थान पर जाने के लिए तैयार रहें।",
+    rec_fire_HIGH: "पास में आग का खतरा अधिक है। उस क्षेत्र से दूर रहें और निकासी के निर्देशों का पालन करें।",
+    rec_fire_MODERATE: "पास में आग का संभावित खतरा है। खुली आग से बचें और सतर्क रहें।",
+    rec_pollution_HIGH: "वायु गुणवत्ता बहुत खराब है। घर के अंदर रहें, बाहर मास्क पहनें और बाहरी गतिविधि से बचें।",
+    rec_pollution_MODERATE: "वायु गुणवत्ता खराब है। बाहरी गतिविधि सीमित रखें, खासकर बच्चों और बुजुर्गों के लिए।"
+  },
+  te: {
+    brand_sub: "వరదలు, మంటలు మరియు వాయు కాలుష్యంపై లైవ్ పర్యవేక్షణ",
+    tab_map: "లైవ్ మ్యాప్", tab_hot: "హాట్‌స్పాట్‌లు", tab_alerts: "హెచ్చరికలు", tab_analytics: "విశ్లేషణ", tab_settings: "నా ప్రాంతం",
+    signin: "సైన్ ఇన్", register: "నమోదు చేసుకోండి", signout: "సైన్ అవుట్",
+    auth_sub_in: "లైవ్ ప్రమాద డేటాను చూడటానికి సైన్ ఇన్ చేయండి.",
+    auth_sub_reg: "మీ ప్రాంతానికి హెచ్చరికలు పొందడానికి ఉచిత పౌర ఖాతాను సృష్టించండి.",
+    email: "ఇమెయిల్", password: "పాస్‌వర్డ్", password_hint: "కనీసం 6 అక్షరాలు",
+    name: "మీ పేరు", area: "ప్రాంతం లేదా గ్రామం", language: "భాష", hazards_label: "నాకు కావలసిన హెచ్చరికలు",
+    use_location: "నా స్థానాన్ని ఉపయోగించండి", location_set: "స్థానం సేవ్ చేయబడింది", location_fail: "స్థానం పొందలేకపోయాం",
+    location_why: "మీ దగ్గరి హెచ్చరికలను చూపించడానికి మాత్రమే.",
+    create_account: "ఖాతా సృష్టించండి", save: "సేవ్ చేయండి", saved: "సేవ్ చేయబడింది",
+    err_signin: "సైన్ ఇన్ విఫలమైంది. ఇమెయిల్ మరియు పాస్‌వర్డ్ తనిఖీ చేయండి.",
+    err_exists: "ఈ ఇమెయిల్ ఇప్పటికే నమోదైంది. సైన్ ఇన్ చేయండి.",
+    err_weak: "పాస్‌వర్డ్ కనీసం 6 అక్షరాలు ఉండాలి.",
+    err_generic: "ఏదో తప్పు జరిగింది. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    err_fields: "దయచేసి మీ పేరు మరియు ప్రాంతం నమోదు చేయండి.",
+    hazard_flood: "వరద", hazard_fire: "అగ్ని", hazard_pollution: "కాలుష్యం", hazard_multi: "బహుళ విపత్తు",
+    risk_HIGH: "అధికం", risk_MODERATE: "మధ్యస్థం", risk_OK: "సాధారణం", risk_OFF: "ఆఫ్‌లైన్",
+    status_online: "ఆన్‌లైన్",
+    stat_nodes: "ఆన్‌లైన్ నోడ్‌లు", stat_alerts: "హెచ్చరికలు (24 గంటలు)", stat_top: "అగ్ర హాట్‌స్పాట్",
+    banner_clear: "అంతా సాధారణం. మీ దగ్గర క్రియాశీల హెచ్చరికలు లేవు.",
+    banner_clear_staff: "అంతా సాధారణం. గత 6 గంటల్లో హెచ్చరికలు లేవు.",
+    banner_high: "{hazard}: అధిక ప్రమాదం", banner_mod: "{hazard}: మధ్యస్థ ప్రమాదం",
+    banner_staff: "గత 6 గంటల్లో {n} హెచ్చరికలు",
+    alerts_title: "హెచ్చరికలు", latest_alerts: "తాజా హెచ్చరికలు",
+    alerts_empty: "ఇంకా హెచ్చరికలు లేవు. ప్రమాదం గుర్తించినప్పుడు ఇక్కడ కనిపిస్తాయి.",
+    filter_all: "అన్నీ", confidence: "విశ్వసనీయత", source_edge: "ఎడ్జ్ AI", source_cloud: "క్లౌడ్ AI",
+    km_away: "{d} కి.మీ. దూరంలో", never: "ఎప్పుడూ లేదు",
+    hot_title: "హాట్‌స్పాట్‌లు", hot_sub: "ఇటీవలి అధిక ప్రమాద హెచ్చరికలు ఎక్కువగా ఉన్న ప్రదేశాలు (గత 7 రోజులు).",
+    hot_empty: "ఇంకా హాట్‌స్పాట్‌లు లేవు.", hot_alerts: "{n} హెచ్చరికలు", hot_last: "చివరి హెచ్చరిక", legend_title: "ప్రమాదం",
+    settings_title: "నా ప్రాంతం మరియు హెచ్చరికలు",
+    val_water: "నీటి మట్టం", val_air: "గాలి నాణ్యత సూచిక", val_temp: "ఉష్ణోగ్రత", val_hum: "తేమ",
+    rec_flood_HIGH: "వెంటనే ఎత్తైన ప్రదేశానికి వెళ్లండి, వరద నీరు ఉన్న రోడ్లను నివారించండి. స్థానిక అధికారుల సూచనలను పాటించండి.",
+    rec_flood_MODERATE: "నీటి మట్టం పెరుగుతోంది. అప్రమత్తంగా ఉండండి, ఎత్తైన ప్రదేశానికి వెళ్లడానికి సిద్ధంగా ఉండండి.",
+    rec_fire_HIGH: "సమీపంలో అగ్ని ప్రమాదం ఎక్కువగా ఉంది. ఆ ప్రాంతానికి దూరంగా ఉండండి, తరలింపు సూచనలను పాటించండి.",
+    rec_fire_MODERATE: "సమీపంలో అగ్ని ప్రమాదం ఉండవచ్చు. బహిరంగ మంటలను నివారించండి, అప్రమత్తంగా ఉండండి.",
+    rec_pollution_HIGH: "గాలి నాణ్యత చాలా తక్కువగా ఉంది. ఇంట్లోనే ఉండండి, బయట మాస్క్ ధరించండి, బయటి కార్యకలాపాలను నివారించండి.",
+    rec_pollution_MODERATE: "గాలి నాణ్యత తక్కువగా ఉంది. బయటి కార్యకలాపాలను తగ్గించండి, ముఖ్యంగా పిల్లలు మరియు వృద్ధులకు."
+  }
+};
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (v, d = 0) => (v === undefined || v === null || isNaN(v)) ? "-" : Number(v).toFixed(d);
+const OFFLINE_S = 120;
+const HAZARDS = ["flood", "fire", "pollution"];
+const RISK_COLOR = { OK: "#1f9d55", MODERATE: "#e08a00", HIGH: "#c62828", OFF: "#8d99a5" };
+
+let lang = "en";
+try { lang = localStorage.getItem("aegis_lang") || "en"; } catch (e) {}
+if (!I18N[lang]) lang = "en";
+const t = (k, vars) => {
+  let s = (I18N[lang] && I18N[lang][k]) ?? I18N.en[k] ?? k;
+  if (vars) for (const v in vars) s = s.replace("{" + v + "}", vars[v]);
+  return s;
+};
+function ago(ts) {
+  if (!ts) return t("never");
+  const s = Math.max(0, Date.now() / 1000 - ts), rtf = new Intl.RelativeTimeFormat(lang, { numeric: "auto" });
+  if (s < 60) return rtf.format(-Math.round(s), "second");
+  if (s < 3600) return rtf.format(-Math.round(s / 60), "minute");
+  if (s < 86400) return rtf.format(-Math.round(s / 3600), "hour");
+  return rtf.format(-Math.round(s / 86400), "day");
+}
+function distKm(a, b) {
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/* ---------- state ---------- */
+let isStaff = false, profile = null, currentUser = null;
+let nodes = {}, alertsAll = [], selected = null, readings = [], fitted = false, fittedHot = false, listening = false;
+let alertFilter = "all", hotFilter = "all", activeTab = "map", pendingProfile = null, sizedLive = false, sizedHot = false;
+const locs = { reg: null, set: null };
+
+/* ---------- static text and language ---------- */
+function applyStatic() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n); });
+  $("brandSub").textContent = t("brand_sub");
+  $("authSub").textContent = t($("formReg").hidden ? "auth_sub_in" : "auth_sub_reg");
+  document.querySelectorAll(".langSel").forEach(s => { s.value = lang; });
+}
+function setLang(l, save = true) {
+  if (!I18N[l]) return;
+  lang = l;
+  if (save) { try { localStorage.setItem("aegis_lang", l); } catch (e) {} }
+  applyStatic(); buildTabs(); renderAll();
+}
+document.querySelectorAll(".langSel").forEach(s => {
+  s.innerHTML = Object.entries(LANGS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("");
+  s.addEventListener("change", e => setLang(e.target.value));
+});
+
+/* ---------- profile form (used for registration and settings) ---------- */
+function profileFieldsHtml(p) {
+  return `
+    <label class="field"><span data-i18n="name"></span><input type="text" id="${p}_name" maxlength="80" autocomplete="name"></label>
+    <label class="field"><span data-i18n="area"></span><input type="text" id="${p}_area" maxlength="120"></label>
+    <label class="field"><span data-i18n="language"></span>
+      <select id="${p}_lang">${Object.entries(LANGS).map(([k, v]) => `<option value="${k}">${v}</option>`).join("")}</select></label>
+    <div class="field"><span data-i18n="hazards_label"></span>
+      <div class="checks">${HAZARDS.map(h => `<label><input type="checkbox" id="${p}_hz_${h}" checked><span data-i18n="hazard_${h}"></span></label>`).join("")}</div></div>
+    <div class="field">
+      <button type="button" class="btn ghost" id="${p}_loc" data-i18n="use_location"></button>
+      <small id="${p}_locmsg" data-i18n="location_why"></small>
+    </div>`;
+}
+function wireProfileForm(p) {
+  $(p + "_lang").value = lang;
+  $(p + "_loc").addEventListener("click", () => {
+    navigator.geolocation?.getCurrentPosition(
+      pos => { locs[p] = { lat: +pos.coords.latitude.toFixed(4), lng: +pos.coords.longitude.toFixed(4) }; $(p + "_locmsg").textContent = t("location_set"); },
+      () => { $(p + "_locmsg").textContent = t("location_fail"); });
+  });
+}
+function readProfileForm(p) {
+  const hz = {}; HAZARDS.forEach(h => { hz[h] = $(`${p}_hz_${h}`).checked; });
+  const o = { name: $(p + "_name").value.trim(), area: $(p + "_area").value.trim(), language: $(p + "_lang").value, hazards: hz };
+  if (locs[p]) { o.lat = locs[p].lat; o.lng = locs[p].lng; }
+  return o;
+}
+function fillProfileForm(p, prof) {
+  if (!prof) return;
+  $(p + "_name").value = prof.name || ""; $(p + "_area").value = prof.area || ""; $(p + "_lang").value = prof.language || lang;
+  HAZARDS.forEach(h => { $(`${p}_hz_${h}`).checked = prof.hazards ? !!prof.hazards[h] : true; });
+  if (prof.lat != null) { locs[p] = { lat: prof.lat, lng: prof.lng }; $(p + "_locmsg").textContent = t("location_set"); }
+}
+$("regFields").innerHTML = profileFieldsHtml("reg");
+$("setFields").innerHTML = profileFieldsHtml("set");
+wireProfileForm("reg"); wireProfileForm("set");
+
+/* ---------- auth ---------- */
+function authTab(reg) {
+  $("formIn").hidden = reg; $("formReg").hidden = !reg;
+  $("tabIn").setAttribute("aria-selected", !reg); $("tabReg").setAttribute("aria-selected", reg);
+  $("authMsg").textContent = ""; applyStatic();
+}
+$("tabIn").onclick = () => authTab(false);
+$("tabReg").onclick = () => authTab(true);
+
+$("btnIn").onclick = async () => {
+  $("authMsg").textContent = "";
+  try { await signInWithEmailAndPassword(auth, $("inEmail").value.trim(), $("inPass").value); }
+  catch (e) { $("authMsg").textContent = t("err_signin"); }
+};
+$("btnReg").onclick = async () => {
+  const msg = $("authMsg"); msg.textContent = "";
+  const prof = readProfileForm("reg");
+  if (!prof.name || !prof.area) { msg.textContent = t("err_fields"); return; }
+  prof.createdAt = Date.now();
+  pendingProfile = prof;                      // saved right after the account exists
+  try { await createUserWithEmailAndPassword(auth, $("regEmail").value.trim(), $("regPass").value); }
+  catch (e) {
+    pendingProfile = null;
+    msg.textContent = e.code === "auth/email-already-in-use" ? t("err_exists")
+      : e.code === "auth/weak-password" ? t("err_weak")
+      : e.code === "auth/invalid-email" ? t("err_signin") : t("err_generic");
+  }
+};
+$("btnOut").onclick = async () => { await signOut(auth); location.reload(); };
+
+onAuthStateChanged(auth, async user => {
+  if (!user) { $("app").hidden = true; $("auth").hidden = false; return; }
+  try {
+    if (pendingProfile) { await set(ref(db, "citizens/" + user.uid), pendingProfile); pendingProfile = null; }
+    isStaff = (await get(ref(db, "staff/" + user.uid))).val() === true;
+    profile = (await get(ref(db, "citizens/" + user.uid))).val();
+  } catch (e) { console.warn("Role lookup failed", e); }
+  let saved = false; try { saved = !!localStorage.getItem("aegis_lang"); } catch (e) {}
+  if (profile && profile.language && I18N[profile.language] && !saved) lang = profile.language;
+  currentUser = user;
+  $("auth").hidden = true; $("app").hidden = false;
+  $("who").textContent = (profile && profile.name) || user.email;
+  fillProfileForm("set", profile);
+  applyStatic(); buildTabs(); showTab("map"); startListeners(); renderAll();
+});
+
+$("btnSave").onclick = async () => {
+  const p = readProfileForm("set"), m = $("setMsg"); m.className = "msg";
+  if (!p.name || !p.area) { m.className = "msg err"; m.textContent = t("err_fields"); return; }
+  p.createdAt = (profile && profile.createdAt) || Date.now();
+  try {
+    await set(ref(db, "citizens/" + currentUser.uid), p);
+    profile = p; $("who").textContent = p.name;
+    m.className = "msg ok"; m.textContent = t("saved");
+    setLang(p.language); renderAll();
+  } catch (e) { m.className = "msg err"; m.textContent = t("err_generic"); }
+};
+
+/* ---------- tabs ---------- */
+function buildTabs() {
+  const list = [["map", "tab_map"], ["hot", "tab_hot"], ["alerts", "tab_alerts"]];
+  list.push(isStaff ? ["analytics", "tab_analytics"] : ["settings", "tab_settings"]);
+  $("tabs").innerHTML = list.map(([id, k]) =>
+    `<button role="tab" data-tab="${id}" aria-selected="${id === activeTab}">${esc(t(k))}</button>`).join("");
+  $("tabs").querySelectorAll("button").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+}
+function showTab(id) {
+  activeTab = id;
+  ["map", "hot", "alerts", "analytics", "settings"].forEach(x => { $("tab-" + x).hidden = x !== id; });
+  $("tabs").querySelectorAll("button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === id));
+  setTimeout(() => {
+    if (id === "map") { mapLive.invalidateSize(); if (!sizedLive) { sizedLive = true; fitted = false; } renderMarkers(); }
+    if (id === "hot") { mapHot.invalidateSize(); if (!sizedHot) { sizedHot = true; fittedHot = false; } renderHot(); }
+  }, 60);
+}
+
+/* ---------- maps ---------- */
+const mkMap = id => {
+  const m = L.map(id).setView([12.9716, 77.5946], 11);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "&copy; OpenStreetMap" }).addTo(m);
+  return m;
+};
+const mapLive = mkMap("map"), mapHot = mkMap("mapHot");
+const markers = {}, hotLayer = L.layerGroup().addTo(mapHot);
+
+const isOnline = n => n.status && n.status.online !== false && (Date.now() / 1000 - (n.status.lastSeen || 0)) < OFFLINE_S;
+function nodeRisk(id) {
+  if (!nodes[id] || !isOnline(nodes[id])) return "OFF";
+  const now = Date.now() / 1000;
+  const rec = alertsAll.filter(a => a.nodeId === id && now - a.ts < 1800);
+  return rec.some(a => a.riskLevel === "HIGH") ? "HIGH" : rec.length ? "MODERATE" : "OK";
+}
+const typeLabel = ty => (ty && HAZARDS.includes(ty)) ? t("hazard_" + ty) : t("hazard_multi");
+
+function popupHtml(id, n) {
+  const l = n.latest || {};
+  return `<b>${esc(id)}</b> (${esc(typeLabel(n.status && n.status.type))})<br>
+    ${t("val_water")}: ${fmt(l.waterLevelCm)} cm<br>${t("val_air")}: ${fmt(l.gasRaw)}<br>
+    ${t("val_temp")}: ${fmt(l.tempC, 1)} &deg;C<br>${t("val_hum")}: ${fmt(l.humidity)} %`;
+}
+
+function renderMarkers() {
+  const bounds = [];
+  Object.keys(nodes).forEach(id => {
+    const s = nodes[id].status || {};
+    if (s.lat == null || s.lng == null) return;
+    if (!markers[id]) {
+      markers[id] = L.circleMarker([s.lat, s.lng], { radius: 12, weight: 3, color: "#fff", fillOpacity: 1 }).addTo(mapLive);
+      markers[id].bindPopup("");
+      markers[id].on("click", () => { if (isStaff) selectNode(id); });
+    }
+    markers[id].setStyle({ fillColor: RISK_COLOR[nodeRisk(id)] });
+    markers[id].setPopupContent(popupHtml(id, nodes[id]));
+    bounds.push([s.lat, s.lng]);
+  });
+  if (!fitted && bounds.length) { mapLive.fitBounds(bounds, { maxZoom: 14, padding: [40, 40] }); fitted = true; }
+}
+
+/* ---------- alerts ---------- */
+const subscribed = h => !profile || !profile.hazards || !Object.values(profile.hazards).some(Boolean) || !!profile.hazards[h];
+function alertHtml(a) {
+  const rk = a.riskLevel === "HIGH" ? "HIGH" : "MODERATE";
+  const rec = isStaff ? a.recommendation : (I18N[lang]["rec_" + a.hazard + "_" + rk] ? t("rec_" + a.hazard + "_" + rk) : a.recommendation);
+  let dist = "";
+  if (!isStaff && profile && profile.lat != null && a.location && a.location.lat != null)
+    dist = " &middot; " + t("km_away", { d: distKm(profile, a.location).toFixed(1) });
+  const staffLine = isStaff ? ` &middot; ${t("confidence")} ${esc(a.confidence)}%` : "";
+  return `<div class="alert ${rk}">
+    <div class="top2"><span>${esc(t("hazard_" + a.hazard))}</span><span>${esc(t("risk_" + rk))}</span></div>
+    <div class="meta">${esc(a.nodeId)} &middot; ${esc(a.source === "edge" ? t("source_edge") : t("source_cloud"))} &middot; ${esc(ago(a.ts))}${dist}${staffLine}</div>
+    ${isStaff && a.detail ? `<div class="meta">${esc(a.detail)}</div>` : ""}
+    <div>${esc(rec)}</div></div>`;
+}
+const chipsHtml = (active) => ["all", ...HAZARDS].map(h =>
+  `<button data-f="${h}" aria-pressed="${h === active}">${esc(h === "all" ? t("filter_all") : t("hazard_" + h))}</button>`).join("");
+
+function renderAlertLists() {
+  const empty = `<div class="empty">${esc(t("alerts_empty"))}</div>`;
+  $("alertsSide").innerHTML = alertsAll.length ? alertsAll.slice(0, 5).map(alertHtml).join("") : empty;
+  $("alertChips").innerHTML = chipsHtml(alertFilter);
+  $("alertChips").querySelectorAll("button").forEach(b => b.onclick = () => { alertFilter = b.dataset.f; renderAlertLists(); });
+  const f = alertsAll.filter(a => alertFilter === "all" || a.hazard === alertFilter);
+  $("alertsAll").innerHTML = f.length ? f.map(alertHtml).join("") : empty;
+}
+
+/* ---------- banner and stats ---------- */
+function withinRadius(a) {
+  if (isStaff || !profile || profile.lat == null || !a.location || a.location.lat == null) return true;
+  return distKm(profile, a.location) <= 25;
+}
+function renderBanner() {
+  const now = Date.now() / 1000;
+  const rel = alertsAll.filter(a => now - a.ts < 6 * 3600 && (isStaff || subscribed(a.hazard)) && withinRadius(a));
+  const b = $("banner");
+  if (!rel.length) { b.className = "ok"; $("bannerText").textContent = t(isStaff ? "banner_clear_staff" : "banner_clear"); return; }
+  const top = rel.find(a => a.riskLevel === "HIGH") || rel[0];
+  b.className = top.riskLevel === "HIGH" ? "high" : "mod";
+  const head = isStaff ? t("banner_staff", { n: rel.length })
+    : t(top.riskLevel === "HIGH" ? "banner_high" : "banner_mod", { hazard: t("hazard_" + top.hazard) });
+  $("bannerText").innerHTML = `${esc(head)}<small>${esc(isStaff ? top.recommendation : (I18N[lang]["rec_" + top.hazard + "_" + (top.riskLevel === "HIGH" ? "HIGH" : "MODERATE")] ? t("rec_" + top.hazard + "_" + (top.riskLevel === "HIGH" ? "HIGH" : "MODERATE")) : top.recommendation))}</small>`;
+}
+function renderStats() {
+  const ids = Object.keys(nodes), online = ids.filter(id => isOnline(nodes[id])).length;
+  const day = alertsAll.filter(a => Date.now() / 1000 - a.ts < 86400).length;
+  const hs = computeHotspots("all")[0];
+  $("stats").innerHTML = [[`${online}/${ids.length}`, "stat_nodes"], [day, "stat_alerts"], [hs ? hs.nodeId : "-", "stat_top"]]
+    .map(([v, k]) => `<div class="stat"><b>${esc(v)}</b><span>${esc(t(k))}</span></div>`).join("");
+  const lg = ["OK", "MODERATE", "HIGH", "OFF"].map(r => `<span><i style="background:${RISK_COLOR[r]}"></i>${esc(t("risk_" + r))}</span>`).join("");
+  $("legendLive").innerHTML = lg;
+}
+
+/* ---------- hotspots ---------- */
+function computeHotspots(filter) {
+  const now = Date.now() / 1000, agg = {};
+  alertsAll.forEach(a => {
+    if (now - a.ts > 7 * 86400) return;
+    if (filter !== "all" && a.hazard !== filter) return;
+    const w = (a.riskLevel === "HIGH" ? 3 : 1) * Math.exp(-(now - a.ts) / (48 * 3600));
+    const s = (nodes[a.nodeId] && nodes[a.nodeId].status) || {};
+    const o = agg[a.nodeId] || (agg[a.nodeId] = { nodeId: a.nodeId, score: 0, high: 0, mod: 0, n: 0, last: 0,
+      lat: s.lat != null ? s.lat : (a.location && a.location.lat), lng: s.lng != null ? s.lng : (a.location && a.location.lng), hz: {} });
+    o.score += w; o.n++; a.riskLevel === "HIGH" ? o.high++ : o.mod++;
+    o.last = Math.max(o.last, a.ts); o.hz[a.hazard] = (o.hz[a.hazard] || 0) + 1;
+  });
+  return Object.values(agg).sort((x, y) => y.score - x.score);
+}
+const hotColor = s => s >= 4 ? RISK_COLOR.HIGH : s >= 1.5 ? RISK_COLOR.MODERATE : "#d4b106";
+function renderHot() {
+  $("hotChips").innerHTML = chipsHtml(hotFilter);
+  $("hotChips").querySelectorAll("button").forEach(b => b.onclick = () => { hotFilter = b.dataset.f; renderHot(); });
+  const list = computeHotspots(hotFilter), max = Math.max(1, ...list.map(h => h.score));
+  hotLayer.clearLayers();
+  const bounds = [];
+  list.forEach(h => {
+    if (h.lat == null) return;
+    L.circleMarker([h.lat, h.lng], { radius: 16 + Math.min(h.score, 10) * 3, color: hotColor(h.score), fillColor: hotColor(h.score),
+      fillOpacity: .45, weight: 2 }).addTo(hotLayer).bindPopup(`<b>${esc(h.nodeId)}</b><br>${esc(t("hot_alerts", { n: h.n }))}`);
+    bounds.push([h.lat, h.lng]);
+  });
+  if (bounds.length && !fittedHot) { mapHot.fitBounds(bounds, { maxZoom: 14, padding: [50, 50] }); fittedHot = true; }
+  $("hotList").innerHTML = list.length ? list.map((h, i) => {
+    const dom = Object.entries(h.hz).sort((a, b) => b[1] - a[1])[0][0];
+    return `<div class="hot" data-lat="${h.lat}" data-lng="${h.lng}">
+      <div class="rank">${i + 1}</div>
+      <div style="flex:1"><b>${esc(h.nodeId)}</b> &middot; ${esc(t("hazard_" + dom))}
+        <div class="muted" style="font-size:.85rem">${esc(t("hot_alerts", { n: h.n }))} &middot; ${esc(t("hot_last"))}: ${esc(ago(h.last))}</div>
+        <div class="bar"><i style="width:${Math.round(100 * h.score / max)}%;background:${hotColor(h.score)}"></i></div></div></div>`;
+  }).join("") : `<div class="empty">${esc(t("hot_empty"))}</div>`;
+  $("hotList").querySelectorAll(".hot").forEach(el => el.onclick = () => {
+    if (el.dataset.lat !== "undefined" && el.dataset.lat !== "null") mapHot.setView([+el.dataset.lat, +el.dataset.lng], 14);
+  });
+  $("legendHot").innerHTML = [["#d4b106", "risk_OK"], [RISK_COLOR.MODERATE, "risk_MODERATE"], [RISK_COLOR.HIGH, "risk_HIGH"]]
+    .map(([c, k]) => `<span><i style="background:${c}"></i>${esc(t(k))}</span>`).join("");
+}
+
+/* ---------- analytics (staff, English) ---------- */
+Chart.defaults.color = getComputedStyle(document.body).getPropertyValue("--muted").trim() || "#576a7b";
+const chart = new Chart($("chart"), {
+  type: "line",
+  data: { labels: [], datasets: [
+    { label: "Water level (cm)", data: [], borderColor: "#1f6fd1", pointRadius: 0, tension: .3 },
+    { label: "Temperature (\u00b0C)", data: [], borderColor: "#d6332b", pointRadius: 0, tension: .3 },
+    { label: "Humidity (%)", data: [], borderColor: "#7a4cc2", pointRadius: 0, tension: .3 },
+    { label: "Gas index (right axis)", data: [], borderColor: "#1f9d55", pointRadius: 0, tension: .3, yAxisID: "y2" }] },
+  options: { responsive: true, maintainAspectRatio: false, animation: false,
+    scales: { y: { title: { display: true, text: "cm / \u00b0C / %" } }, y2: { position: "right", grid: { drawOnChartArea: false }, title: { display: true, text: "gas index" } } } }
+});
+let unsubReadings = null;
+function selectNode(id) {
+  selected = id; $("anTitle").textContent = "Readings for " + id; renderAnalytics();
+  if (unsubReadings) unsubReadings();
+  unsubReadings = onValue(query(ref(db, "readings/" + id), orderByKey(), limitToLast(100)), snap => {
+    readings = Object.values(snap.val() || {}).sort((a, b) => a.ts - b.ts);
+    chart.data.labels = readings.map(r => new Date(r.ts * 1000).toLocaleTimeString());
+    chart.data.datasets[0].data = readings.map(r => r.waterLevelCm);
+    chart.data.datasets[1].data = readings.map(r => r.tempC);
+    chart.data.datasets[2].data = readings.map(r => r.humidity);
+    chart.data.datasets[3].data = readings.map(r => r.gasRaw);
+    chart.update();
+  });
+}
+function renderAnalytics() {
+  if (!isStaff) return;
+  const ids = Object.keys(nodes);
+  $("nodeRows").innerHTML = ids.map(id => {
+    const n = nodes[id], s = n.status || {}, on = isOnline(n), l = n.latest || {};
+    return `<tr class="node ${id === selected ? "sel" : ""}" data-id="${esc(id)}"><td>${esc(id)}</td><td>${esc(s.type)}</td>
+      <td><span class="dotc" style="background:${on ? RISK_COLOR.OK : RISK_COLOR.OFF}"></span>${on ? "Online" : "Offline"}</td>
+      <td>${esc(ago(s.lastSeen))}</td><td>${fmt(l.rssi)}</td><td>${l.edgeClass ? esc(l.edgeClass) + " (" + fmt(l.edgeConf) + "%)" : "-"}</td></tr>`;
+  }).join("") || `<tr><td colspan="6" class="empty">No nodes reporting yet.</td></tr>`;
+  document.querySelectorAll("tr.node").forEach(tr => tr.onclick = () => selectNode(tr.dataset.id));
+  const n = nodes[selected];
+  if (n) {
+    const l = n.latest || {};
+    $("vals").innerHTML = [["Water level", fmt(l.waterLevelCm) + " cm"], ["Gas index", fmt(l.gasRaw)], ["Temperature", fmt(l.tempC, 1) + " \u00b0C"],
+      ["Humidity", fmt(l.humidity) + " %"], ["Edge AI on node", l.edgeClass ? `${l.edgeClass} (${fmt(l.edgeConf)}%)` : "-"],
+      ["Forecast in 30 min", l.forecast30Cm != null ? fmt(l.forecast30Cm) + " cm" : "-"]]
+      .map(([k, v]) => `<div><b>${esc(v)}</b><span>${k}</span></div>`).join("");
+  } else if (ids.length) selectNode(ids[0]);
+}
+$("csvBtn").onclick = () => {
+  if (!readings.length) { alert("Select a node with readings first."); return; }
+  const head = ["time", "waterLevelCm", "gasRaw", "tempC", "humidity", "rssi", "edgeClass"];
+  const rows = readings.map(r => [new Date(r.ts * 1000).toISOString(), r.waterLevelCm, r.gasRaw, r.tempC, r.humidity, r.rssi, r.edgeClass].join(","));
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([head.join(",") + "\n" + rows.join("\n")], { type: "text/csv" }));
+  a.download = `aegis_${selected}_report.csv`; a.click();
+};
+
+/* ---------- live data ---------- */
+function renderAll() { renderMarkers(); renderAlertLists(); renderBanner(); renderStats(); renderHot(); renderAnalytics(); }
+function startListeners() {
+  if (listening) return; listening = true;
+  onValue(ref(db, "nodes"), s => { nodes = s.val() || {}; renderAll(); });
+  onValue(query(ref(db, "alerts"), limitToLast(300)), s => {
+    alertsAll = Object.values(s.val() || {}).sort((a, b) => b.ts - a.ts); renderAll();
+  });
+  setInterval(renderAll, 15000);              // keeps "x seconds ago" and offline status fresh
+}
+applyStatic();
+</script>
+</body>
+</html>
